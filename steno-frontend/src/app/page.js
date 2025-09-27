@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Upload, Key, Download, Shuffle, FileText, Settings } from "lucide-react";
+import { Upload, Key, Download, Shuffle, FileText, Settings, Lock, Unlock } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
+  const router = useRouter();
   const [selectedFile, setSelectedFile] = useState(null);
   const [embedFile, setEmbedFile] = useState(null);
   const [key, setKey] = useState("");
@@ -74,6 +76,27 @@ export default function Home() {
           <p className="text-lg text-slate-600">
             Embed files securely into MP3 audio files
           </p>
+          
+          {/* Navigation Buttons */}
+          <div className="flex justify-center gap-4 mt-8">
+            <Button
+              disabled={true}
+              size="lg"
+              className="px-6 py-2 bg-slate-700 text-white font-medium disabled:bg-slate-400 disabled:cursor-not-allowed"
+            >
+              <Lock className="w-4 h-4 mr-2" />
+              Encrypt
+            </Button>
+            <Button
+              onClick={() => router.push('/decrypt')}
+              variant="outline"
+              size="lg"
+              className="px-6 py-2 border-slate-300 text-slate-700 hover:bg-slate-50"
+            >
+              <Unlock className="w-4 h-4 mr-2" />
+              Decrypt
+            </Button>
+          </div>
         </div>
 
         {/* Main Container */}
