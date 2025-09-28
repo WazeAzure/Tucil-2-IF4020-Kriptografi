@@ -1,7 +1,9 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 import os
 from werkzeug.utils import secure_filename
+import json
+import base64
 
 app = Flask(__name__)
 CORS(app)
@@ -61,6 +63,8 @@ def encrypt():
         
         mp3_data = mp3_file.read()
         embed_data = embed_file.read()
+
+        psnr = 69
         
         print(f"Processing steganography:")
         print(f"  MP3 File: {mp3_filename}")
@@ -68,6 +72,7 @@ def encrypt():
         print(f"  Use Encryption: {use_encryption}")
         print(f"  Random Embedding: {random_embedding}")
         print(f"  LSB Bits: {lsb_bits}")
+        print(f"  PSNR: {psnr}")
         if key:
             print(f"  Key/Seed: {key}")
         
@@ -79,12 +84,9 @@ def encrypt():
             'useEncryption': use_encryption,
             'randomEmbedding': random_embedding,
             'lsbBits': lsb_bits,
-            'encryptionKey': key if key else None
+            'encryptionKey': key if key else None,
+            'psnr' : psnr
         }
-        
-        from flask import Response
-        import json
-        import base64
         
         encoded_audio = base64.b64encode(processed_mp3_data).decode('utf-8')
         
@@ -104,7 +106,66 @@ def encrypt():
             'error': str(e)
         }), 500
 
-
+@app.route('/decrypt', methods=['POST'])
+def decrypt():
+    try:
+        if 'mp3File' not in request.files:
+            return jsonify({
+                'success': False,
+                'error': 'Missing required MP3 file'
+            }), 400
+        
+        mp3_file = request.files['mp3File']
+        
+        use_encryption = request.form.get('useEncryption', 'false').lower() == 'true'
+        lsb_bits = int(request.form.get('lsbBits', '1'))
+        key = request.form.get('key', '')
+        
+        if mp3_file.filename == '':
+            return jsonify({
+                'success': False,
+                'error': 'No file selected'
+            }), 400
+        
+        mp3_filename = secure_filename(mp3_file.filename)
+        mp3_data = mp3_file.read()
+        
+        print(f"Processing decryption:")
+        print(f"  MP3 File: {mp3_filename}")
+        print(f"  Use Encryption: {use_encryption}")
+        print(f"  LSB Bits: {lsb_bits}")
+        if key:
+            print(f"  Key: {key}")
+        
+        extracted_content = "This is a placeholder extracted file content.\nThe actual steganography decryption will be implemented later."
+        extracted_filename = "extracted_secret.txt"
+        
+        configuration = {
+            'fileExtension': '.txt',
+            'fileName': extracted_filename,
+            'secretFileSize': '2.1 KB',
+            'useEncryption': use_encryption,
+            'randomEmbedPoint': True,
+            'lsbBits': lsb_bits
+        }
+        
+        encoded_file = base64.b64encode(extracted_content.encode('utf-8')).decode('utf-8')
+        
+        return jsonify({
+            'success': True,
+            'message': 'Decryption completed successfully',
+            'configuration': configuration,
+            'extractedFileName': extracted_filename,
+            'extractedFileData': encoded_file,
+            'mimeType': 'text/plain'
+        })
+    
+    except Exception as e:
+        print(f"Error in decrypt: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 if __name__=='__main__': 
    app.run(debug=True, port=5000) 

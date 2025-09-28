@@ -423,6 +423,7 @@ export default function Home() {
                           <div><strong>Use Encryption:</strong> {configuration.useEncryption ? 'Yes' : 'No'}</div>
                           <div><strong>Random Embedding:</strong> {configuration.randomEmbedding ? 'Yes' : 'No'}</div>
                           <div><strong>LSB Bits:</strong> {configuration.lsbBits}-bit</div>
+                          <div><strong>PSNR:</strong> {configuration.psnr}</div>
                           {configuration.encryptionKey && (
                             <div><strong>Encryption Key:</strong> {configuration.encryptionKey}</div>
                           )}
