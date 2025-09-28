@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Upload, Key, Download, Shuffle, FileText, Lock, Unlock } from "lucide-react";
+import { Upload, Key, Download, Shuffle, FileText } from "lucide-react";
 import { useRouter } from "next/navigation";
+import NavButton from "@/components/ui/navButton";
 
 export default function Decrypt() {
   const router = useRouter();
@@ -69,25 +70,7 @@ export default function Decrypt() {
           </p>
           
           {/* Navigation Buttons */}
-          <div className="flex justify-center gap-4 mt-8">
-            <Button
-              onClick={() => router.push('/')}
-              variant="outline"
-              size="lg"
-              className="px-6 py-2 border-slate-300 text-slate-700 hover:bg-slate-50"
-            >
-              <Lock className="w-4 h-4 mr-2" />
-              Encrypt
-            </Button>
-            <Button
-              disabled={true}
-              size="lg"
-              className="px-6 py-2 bg-slate-700 text-white font-medium disabled:bg-slate-400 disabled:cursor-not-allowed"
-            >
-              <Unlock className="w-4 h-4 mr-2" />
-              Decrypt
-            </Button>
-          </div>
+          <NavButton />
         </div>
 
         {/* Main Container */}
