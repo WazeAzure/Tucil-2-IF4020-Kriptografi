@@ -5,6 +5,8 @@ from werkzeug.utils import secure_filename
 import json
 import base64
 
+import LSB_AUDIO.main_pipeline as mp
+
 app = Flask(__name__)
 CORS(app)
 
@@ -44,6 +46,8 @@ def encrypt():
                 'error': 'Missing required files (mp3File and embedFile)'
             }), 400
         
+        config = {}
+
         mp3_file = request.files['mp3File']
         embed_file = request.files['embedFile']
         
@@ -65,7 +69,16 @@ def encrypt():
         embed_data = embed_file.read()
 
         psnr = 69
+
+        config['originalFileName'] = mp3_filename
+        config['embeddedFileName'] = embed_filename
+        config['useEncryption'] = use_encryption
+        config['randomEmbedding'] = random_embedding
+        config['lsbBits'] = lsb_bits
+        config['encryptionKey'] = key if key else None
         
+        mp.encrypt(config, mp3_data, embed_data)
+
         print(f"Processing steganography:")
         print(f"  MP3 File: {mp3_filename}")
         print(f"  Embed File: {embed_filename}")
