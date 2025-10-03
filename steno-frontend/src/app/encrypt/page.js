@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Upload, Key, Download, Shuffle, FileText, Settings } from "lucide-react";
+import { Upload, Key, Download, Shuffle, FileText, Settings, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import NavButton from "@/components/ui/navButton";
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 export default function Home() {
   const router = useRouter();
@@ -21,6 +23,7 @@ export default function Home() {
   const [processedFileName, setProcessedFileName] = useState("");
   const [configuration, setConfiguration] = useState(null);
   const [processedAudioUrl, setProcessedAudioUrl] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -48,6 +51,7 @@ export default function Home() {
       setSelectedFile(file);
       const url = URL.createObjectURL(file);
       setAudioUrl(url);
+      toast.success('MP3 file uploaded successfully!');
     } else {
       setFileName('')
       alert("Please select an MP3 file");
@@ -63,6 +67,7 @@ export default function Home() {
     const file = event.target.files[0];
     if (file) {
       setEmbedFile(file);
+      toast.success('File to embed uploaded successfully!');
     }
   };
 
@@ -85,6 +90,7 @@ export default function Home() {
   const handleEmbedFile = async () => {
     if (!selectedFile || !embedFile) return;
 
+    setIsLoading(true);
     try {
       const formData = new FormData();
       formData.append('mp3File', selectedFile);
@@ -115,6 +121,7 @@ export default function Home() {
         setOutputFile(selectedFile);
         setProcessedFileName(result.outputFile);
         setConfiguration(result.configuration);
+        toast.success('File embedded successfully!');
         
         if (result.audioData) {
           try {
@@ -148,6 +155,8 @@ export default function Home() {
     } catch (error) {
       console.error("Error during embedding:", error);
       alert(`Error during embedding: ${error.message}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -360,11 +369,18 @@ export default function Home() {
           <div className="flex justify-center pt-4">
             <Button
               onClick={handleEmbedFile}
-              disabled={!selectedFile || !embedFile || ((useEncryption || randomEmbedding) && !key)}
+              disabled={!selectedFile || !embedFile || ((useEncryption || randomEmbedding) && !key) || isLoading}
               size="lg"
               className="px-8 py-3 bg-slate-700 hover:bg-slate-800 text-white font-medium disabled:bg-slate-300 disabled:cursor-not-allowed"
             >
-              Embed File
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Embedding...
+                </>
+              ) : (
+                "Embed File"
+              )}
             </Button>
           </div>
 
@@ -423,7 +439,6 @@ export default function Home() {
                           <div><strong>Use Encryption:</strong> {configuration.useEncryption ? 'Yes' : 'No'}</div>
                           <div><strong>Random Embedding:</strong> {configuration.randomEmbedding ? 'Yes' : 'No'}</div>
                           <div><strong>LSB Bits:</strong> {configuration.lsbBits}-bit</div>
-                          <div><strong>PSNR:</strong> {configuration.psnr}</div>
                           {configuration.encryptionKey && (
                             <div><strong>Encryption Key:</strong> {configuration.encryptionKey}</div>
                           )}
@@ -470,6 +485,19 @@ export default function Home() {
           <p>Secure audio steganography with encryption</p>
         </div>
       </div>
+      
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     </div>
   );
 }

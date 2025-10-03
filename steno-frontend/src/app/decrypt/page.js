@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Upload, Key, Download, Shuffle, FileText, Settings } from "lucide-react";
+import { Upload, Key, Download, Shuffle, FileText, Settings, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import NavButton from "@/components/ui/navButton";
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 export default function Decrypt() {
   const router = useRouter();
@@ -12,18 +14,42 @@ export default function Decrypt() {
   const [key, setKey] = useState("");
   const [extractedFile, setExtractedFile] = useState(null);
   const [useEncryption, setUseEncryption] = useState(true);
+  const [randomEmbedding, setRandomEmbedding] = useState(false);
   const [lsbBits, setLsbBits] = useState(1);
   const [configuration, setConfiguration] = useState(null);
   const [extractedFileUrl, setExtractedFileUrl] = useState(null);
+  const [audioUrl, setAudioUrl] = useState(null);
+  const [fileName, setFileName] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+
+  useEffect(() => {
+    return () => {
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
+    };
+  }, [audioUrl]);
 
   const handleFileChange = (event) => {
     const file = event.target.files[0];
     if (file && file.type === "audio/mpeg") {
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
+      setFileName(file?.name);
       setSelectedFile(file);
+      const url = URL.createObjectURL(file);
+      setAudioUrl(url);
+      toast.success('MP3 file uploaded successfully!');
     } else {
+      setFileName('');
       alert("Please select an MP3 file");
       event.target.value = "";
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+        setAudioUrl(null);
+      }
     }
   };
 
@@ -46,13 +72,15 @@ export default function Decrypt() {
   const handleExtractFile = async () => {
     if (!selectedFile) return;
 
+    setIsLoading(true);
     try {
       const formData = new FormData();
       formData.append('mp3File', selectedFile);
       formData.append('useEncryption', useEncryption.toString());
+      formData.append('randomEmbedding', randomEmbedding.toString());
       formData.append('lsbBits', lsbBits.toString());
       
-      if (useEncryption && key) {
+      if ((useEncryption || randomEmbedding) && key) {
         formData.append('key', key);
       }
 
@@ -72,6 +100,7 @@ export default function Decrypt() {
       if (result.success) {
         console.log("Decrypt successful:", result);
         setConfiguration(result.configuration);
+        toast.success('File extracted successfully!');
         
         if (result.extractedFileData) {
           try {
@@ -102,6 +131,8 @@ export default function Decrypt() {
     } catch (error) {
       console.error("Error during decryption:", error);
       alert(`Error during decryption: ${error.message}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -133,9 +164,38 @@ export default function Decrypt() {
                 className="block w-full text-sm text-slate-500 file:mr-4 file:py-3 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
               />
             </div>
-            {selectedFile && (
-              <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg">
-                <strong>Selected:</strong> {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+            {selectedFile && fileName && (
+              <div className="space-y-4">
+                <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg">
+                  <strong>Selected:</strong> {fileName} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                </div>
+                
+                {audioUrl && (
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center">
+                        <svg className="w-4 h-4 text-slate-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM15.657 6.343a1 1 0 011.414 0A9.972 9.972 0 0119 12a9.972 9.972 0 01-1.929 5.657 1 1 0 11-1.414-1.414A7.971 7.971 0 0017 12a7.971 7.971 0 00-1.343-4.243 1 1 0 010-1.414z" clipRule="evenodd" />
+                          <path fillRule="evenodd" d="M13.829 8.172a1 1 0 011.414 0A5.983 5.983 0 0117 12a5.983 5.983 0 01-1.757 3.828 1 1 0 11-1.414-1.414A3.987 3.987 0 0015 12a3.987 3.987 0 00-1.171-2.828 1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <span className="text-sm font-medium text-slate-700">Embedded Audio Preview</span>
+                    </div>
+                    <audio 
+                      key={audioUrl}
+                      controls 
+                      className="w-full h-10"
+                      preload="metadata"
+                      style={{
+                        outline: 'none',
+                        background: 'transparent'
+                      }}
+                    >
+                      <source src={audioUrl} type="audio/mpeg" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -189,13 +249,44 @@ export default function Decrypt() {
                 </select>
               </div>
             </div>
+
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium text-slate-900">Random Embedding Point</h4>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="randomEmbedding"
+                    checked={randomEmbedding}
+                    onChange={() => setRandomEmbedding(true)}
+                    className="w-4 h-4 text-slate-600 border-slate-300 focus:ring-slate-500"
+                  />
+                  <span className="text-sm text-slate-700">Yes</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="randomEmbedding"
+                    checked={!randomEmbedding}
+                    onChange={() => setRandomEmbedding(false)}
+                    className="w-4 h-4 text-slate-600 border-slate-300 focus:ring-slate-500"
+                  />
+                  <span className="text-sm text-slate-700">No</span>
+                </label>
+              </div>
+            </div>
           </div>
 
-          {useEncryption && (
+          {(useEncryption || randomEmbedding) && (
             <div className="space-y-4">
               <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
                 <Key className="w-4 h-4" />
-                Decryption Key (max 25 characters)
+                {useEncryption && randomEmbedding 
+                  ? "Decryption Key & Randomization Seed (max 25 characters)"
+                  : useEncryption 
+                  ? "Decryption Key (max 25 characters)"
+                  : "Randomization Seed (max 25 characters)"
+                }
               </label>
               <div className="flex gap-3">
                 <div className="flex-1 relative">
@@ -204,7 +295,12 @@ export default function Decrypt() {
                     value={key}
                     onChange={handleKeyChange}
                     maxLength={25}
-                    placeholder="Enter your decryption key"
+                    placeholder={useEncryption && randomEmbedding 
+                      ? "Enter key/seed (used for both decryption and randomization)"
+                      : useEncryption 
+                      ? "Enter your decryption key"
+                      : "Enter your randomization seed"
+                    }
                     className="block w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent text-sm"
                   />
                   <div className="absolute right-3 top-3 text-xs text-slate-400">
@@ -221,6 +317,11 @@ export default function Decrypt() {
                   Random
                 </Button>
               </div>
+              {useEncryption && randomEmbedding && (
+                <div className="text-sm text-slate-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <strong>Note:</strong> The same string will be used as both the decryption key and the randomization seed.
+                </div>
+              )}
             </div>
           )}
 
@@ -228,11 +329,18 @@ export default function Decrypt() {
           <div className="flex justify-center pt-4">
             <Button
               onClick={handleExtractFile}
-              disabled={!selectedFile || (useEncryption && !key)}
+              disabled={!selectedFile || ((useEncryption || randomEmbedding) && !key) || isLoading}
               size="lg"
               className="px-8 py-3 bg-slate-700 hover:bg-slate-800 text-white font-medium disabled:bg-slate-300 disabled:cursor-not-allowed"
             >
-              Extract File
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Extracting...
+                </>
+              ) : (
+                "Extract File"
+              )}
             </Button>
           </div>
 
@@ -265,7 +373,6 @@ export default function Decrypt() {
                         <div className="space-y-1 text-xs text-slate-600">
                           <div><strong>File Extension:</strong> {configuration.fileExtension}</div>
                           <div><strong>File Name:</strong> {configuration.fileName}</div>
-                          <div><strong>Secret File Size:</strong> {configuration.secretFileSize}</div>
                           <div><strong>Use Encryption:</strong> {configuration.useEncryption ? 'Yes' : 'No'}</div>
                           <div><strong>Random Embed Point:</strong> {configuration.randomEmbedPoint ? 'Yes' : 'No'}</div>
                           <div><strong>LSB Bits:</strong> {configuration.lsbBits}-bit</div>
@@ -311,6 +418,19 @@ export default function Decrypt() {
           <p>Decrypt and extract hidden files from audio steganography</p>
         </div>
       </div>
+      
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     </div>
   );
 }
