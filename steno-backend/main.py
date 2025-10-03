@@ -125,6 +125,7 @@ def decrypt():
         mp3_file = request.files['mp3File']
         
         use_encryption = request.form.get('useEncryption', 'false').lower() == 'true'
+        random_embedding = request.form.get('randomEmbedding', 'false').lower() == 'true'
         lsb_bits = int(request.form.get('lsbBits', '1'))
         key = request.form.get('key', '')
         
@@ -140,11 +141,12 @@ def decrypt():
         print(f"Processing decryption:")
         print(f"  MP3 File: {mp3_filename}")
         print(f"  Use Encryption: {use_encryption}")
+        print(f"  Random Embedding: {random_embedding}")
         print(f"  LSB Bits: {lsb_bits}")
         if key:
             print(f"  Key: {key}")
 
-        config, result = mp.decrypt(mp3_data, key=key if key else None)
+        config, result = mp.decrypt(mp3_data, key=key if (key and (use_encryption or random_embedding)) else None, is_scrambled=random_embedding, is_encrypted=use_encryption)
         
         extracted_content = result
         extracted_filename = config["fn"]

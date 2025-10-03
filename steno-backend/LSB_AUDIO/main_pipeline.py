@@ -43,8 +43,11 @@ def encrypt(config : dict, audio_data, embed_data):
 
     payload_data = embbedded_config_json + embed_data
     
+    seed = None
+
     if config['encryptionKey'] is not None:
         payload_data = ci.vignereCipher(payload_data, generated_key)
+        seed = ci.generateSeed(generated_key)
     
     final_payload = config_len_bytes + payload_data
 
@@ -52,21 +55,30 @@ def encrypt(config : dict, audio_data, embed_data):
                     final_payload,
                     bits_per_byte=config['lsbBits'],
                     step=1,
-                    start_frame=0)
+                    start_frame=0,
+                    seed=seed)
     print("embbedded_config_json:", embbedded_config_json)
     return result
 
-def decrypt(audio_data, key=None):
-    result = ad.extract_binary(audio_data, step=1, start_frame=0)
+def decrypt(audio_data, key=None, is_scrambled=False, is_encrypted=False):
+    scramble_seed = None
+    if is_scrambled and key is not None:
+        generated_key = ci.generateKey(key)
+        scramble_seed = ci.generateSeed(generated_key)
+        print("Generated Key:", generated_key)
+        print("Generated Scramble Seed:", scramble_seed)
+    elif key is not None:
+        generated_key = ci.generateKey(key)
+        print("Generated Key:", generated_key)
+    
+    result = ad.extract_binary(audio_data, step=1, start_frame=0, seed=scramble_seed)
     if result is None:
         raise ValueError("No hidden data found in the audio file.")
     
     config_length = struct.unpack(">I", result[:4])[0]
     encrypted_payload = result[4:]
     
-    if key is not None:
-        generated_key = ci.generateKey(key)
-        print("Generated Key:", generated_key)
+    if is_encrypted and key is not None:
         decrypted_payload = ci.vignereDecipher(encrypted_payload, generated_key)
     else:
         decrypted_payload = encrypted_payload

@@ -45,6 +45,7 @@ import os
 import struct
 import argparse
 import math
+import random
 
 # ---------- MP3 parsing helpers (MPEG-1 Layer III focus) ----------
 def is_frame_sync(header: bytes) -> bool:
@@ -254,6 +255,27 @@ def scan_frames_for_ancillary(mp3_bytes: bytes) -> List[Dict]:
     return results
 
 # ---------- embedding/extraction helpers ----------
+def scramble_frames_with_seed(frames_info: List[Dict], seed: int) -> List[Dict]:
+    """
+    Scramble the order of frames using a seed for reproducible randomization.
+    
+    Args:
+        frames_info: Original frames list from scan_frames_for_ancillary
+        seed: Integer seed for reproducible randomization
+    
+    Returns:
+        New list with frames in scrambled order
+    """
+    # Create a copy to avoid modifying the original
+    scrambled_frames = frames_info.copy()
+    
+    # Set seed for reproducible randomization
+    random.seed(seed)
+    
+    # Shuffle the frames
+    random.shuffle(scrambled_frames)
+    
+    return scrambled_frames
 def embed_into_ancillary(mp3_bytes: bytearray, frames_info: List[Dict], payload_bits: str,
                          bits_per_byte: int = 1, step: int = 1, start_frame: int = 0):
     """
@@ -441,7 +463,7 @@ def cmd_embed(input_mp3: str, output_mp3: str, payload_path: Optional[str], text
     print("[*] Extraction can be done with same step/start_frame and bits_per_byte parameters.")
 
 def embed_binary(input_mp3_data: bytes, payload_data: bytes,
-                 bits_per_byte: int = 1, step: int = 1, start_frame: int = 0) -> bytes:
+                 bits_per_byte: int = 1, step: int = 1, start_frame: int = 0, seed: int = None) -> bytes:
     """
     Embed payload into MP3 binary data and return the modified MP3 data.
     
@@ -451,12 +473,18 @@ def embed_binary(input_mp3_data: bytes, payload_data: bytes,
         bits_per_byte: Number of LSBs to use per ancillary byte (1 or 2)
         step: Use every N-th frame for embedding
         start_frame: Frame index to start embedding at
+        scramble_seed: Optional seed for scrambling frame order (None = no scrambling)
     
     Returns:
         Modified MP3 data as bytes
     """
     mp3 = bytearray(input_mp3_data)
     frames = scan_frames_for_ancillary(mp3)
+    
+    # Scramble frames if seed is provided
+    if seed is not None:
+        frames = scramble_frames_with_seed(frames, seed)
+        print(f"[*] Scrambled frame order using seed: {seed}")
     
     # convert payload binary data to bits
     payload_bits = ''.join(f"{b:08b}" for b in payload_data)
@@ -471,7 +499,7 @@ def embed_binary(input_mp3_data: bytes, payload_data: bytes,
     
     return bytes(mp3)
 
-def extract_binary(input_mp3_data: bytes, bits_per_byte: int = 1, step: int = 1, start_frame: int = 0) -> bytes:
+def extract_binary(input_mp3_data: bytes, bits_per_byte: int = 1, step: int = 1, start_frame: int = 0, seed: int = None) -> bytes:
     """
     Extract payload from MP3 binary data and return the extracted binary data.
     
@@ -480,11 +508,18 @@ def extract_binary(input_mp3_data: bytes, bits_per_byte: int = 1, step: int = 1,
         bits_per_byte: Number of LSBs used per ancillary byte (1 or 2)
         step: Frame step used during embedding
         start_frame: Frame index where embedding started
+        scramble_seed: Seed used for scrambling during embedding (None = no scrambling)
     
     Returns:
         Extracted binary data as bytes
     """
     frames = scan_frames_for_ancillary(input_mp3_data)
+    
+    # Use same scrambling as during embedding
+    if seed is not None:
+        frames = scramble_frames_with_seed(frames, seed)
+        print(f"[*] Using scrambled frame order with seed: {seed}")
+    
     bitstr = extract_from_ancillary(input_mp3_data, frames, bits_per_byte=bits_per_byte, step=step, start_frame=start_frame)
     
     print(f"[*] Extracted bits length: {len(bitstr)} (first 200 chars): {bitstr[:200]}")
