@@ -8,7 +8,7 @@ def vignereCipher(input: bytes, key: bytes)-> bytes:
         output.append((input[i] + key_c) % 256)
     return bytes(output)
 
-def vignereDecipher(input: bytes, key: str)-> bytes:
+def vignereDecipher(input: bytes, key: bytes)-> bytes:
     output = bytearray()
     key_length = len(key)
     for i in range(len(input)):

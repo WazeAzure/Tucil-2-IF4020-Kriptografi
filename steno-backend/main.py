@@ -144,7 +144,7 @@ def decrypt():
         if key:
             print(f"  Key: {key}")
 
-        config, result = mp.decrypt(mp3_data)
+        config, result = mp.decrypt(mp3_data, key=key if key else None)
         
         extracted_content = result
         extracted_filename = config["fn"]
