@@ -255,7 +255,7 @@ def scan_frames_for_ancillary(mp3_bytes: bytes) -> List[Dict]:
 
 # ---------- embedding/extraction helpers ----------
 def embed_into_ancillary(mp3_bytes: bytearray, frames_info: List[Dict], payload_bits: str,
-                         bits_per_byte: int = 1, step: int = 1, start_frame: int = 0, max_bytes: Optional[int]=None):
+                         bits_per_byte: int = 1, step: int = 1, start_frame: int = 0):
     """
     Embed payload_bits (string of '0'/'1') into ancillary bytes' LSBs.
     - bits_per_byte: 1 or 2 (number of LSBs to use in each ancillary byte)
@@ -268,10 +268,14 @@ def embed_into_ancillary(mp3_bytes: bytearray, frames_info: List[Dict], payload_
     for f in frames_info:
         if f['ancillary_len'] > 0:
             total_capacity_bits += f['ancillary_len'] * bits_per_byte
-    if max_bytes is not None:
-        total_capacity_bits = min(total_capacity_bits, max_bytes * bits_per_byte)
-    if len(payload_bits) > total_capacity_bits:
-        raise ValueError(f"Payload too large for ancillary capacity: need {len(payload_bits)} bits, capacity {total_capacity_bits} bits")
+    
+    # Add 32-bit length prefix to mark payload size
+    payload_length = len(payload_bits)
+    length_bits = f"{payload_length:032b}"  # 32-bit length prefix
+    full_payload = length_bits + payload_bits
+    
+    if len(full_payload) > total_capacity_bits:
+        raise ValueError(f"Payload too large for ancillary capacity: need {len(full_payload)} bits (including 32-bit length), capacity {total_capacity_bits} bits")
 
     bit_idx = 0
     used = []
@@ -284,8 +288,6 @@ def embed_into_ancillary(mp3_bytes: bytearray, frames_info: List[Dict], payload_
             continue
         # iterate bytes in ancillary region
         for b in range(f['ancillary_len']):
-            if max_bytes is not None and len(used) >= max_bytes:
-                break
             abs_idx = f['ancillary_idx'] + b
             if abs_idx >= len(mp3_bytes):
                 break
@@ -294,10 +296,10 @@ def embed_into_ancillary(mp3_bytes: bytearray, frames_info: List[Dict], payload_
             newval = orig
             bits_collected = []
             for k in range(bits_per_byte):
-                if bit_idx >= len(payload_bits):
+                if bit_idx >= len(full_payload):
                     bit = 0
                 else:
-                    bit = int(payload_bits[bit_idx])
+                    bit = int(full_payload[bit_idx])
                 bits_collected.append(bit)
                 bit_idx += 1
             # assemble bits_collected into integer (MSB-first inside these LSB slots)
@@ -309,9 +311,9 @@ def embed_into_ancillary(mp3_bytes: bytearray, frames_info: List[Dict], payload_
             newval = (orig & mask) | val
             mp3_bytes[abs_idx] = newval
             used.append((f['frame_index'], abs_idx, bits_collected))
-            if bit_idx >= len(payload_bits):
+            if bit_idx >= len(full_payload):
                 break
-        if bit_idx >= len(payload_bits):
+        if bit_idx >= len(full_payload):
             break
     return bit_idx, used
 
@@ -319,11 +321,15 @@ def extract_from_ancillary(mp3_bytes: bytes, frames_info: List[Dict], bits_per_b
                            step: int = 1, start_frame: int = 0, max_bits: Optional[int]=None):
     """
     Read bits from ancillary LSBs in the same traversal order used for embed.
-    Returns concatenated bitstring.
+    First reads 32-bit length prefix, then extracts exact payload length.
+    Returns concatenated bitstring of just the payload (without length prefix).
     """
     bits = []
     frames_count = len(frames_info)
     collected = 0
+    payload_length = None
+    target_bits = 32  # Start by reading 32-bit length prefix
+    
     for fi in range(start_frame, frames_count, 1):
         f = frames_info[fi]
         if (fi - start_frame) % step != 0:
@@ -341,8 +347,27 @@ def extract_from_ancillary(mp3_bytes: bytes, frames_info: List[Dict], bits_per_b
             for k in reversed(range(bits_per_byte)):
                 bits.append('1' if ((val >> k) & 1) else '0')
                 collected += 1
+                
+                # After reading 32 bits, decode the length and update target
+                if collected == 32 and payload_length is None:
+                    length_bits = ''.join(bits[:32])
+                    payload_length = int(length_bits, 2)
+                    target_bits = 32 + payload_length  # Length prefix + actual payload
+                    print(f"[*] Detected payload length: {payload_length} bits")
+                
+                # Stop when we've read the exact amount needed
+                if collected >= target_bits:
+                    # Return only the payload part (skip the 32-bit length prefix)
+                    return ''.join(bits[32:32+payload_length]) if payload_length is not None else ''.join(bits)
+                
+                # Respect max_bits parameter if provided (for backward compatibility)
                 if max_bits is not None and collected >= max_bits:
                     return ''.join(bits)
+    
+    # If we didn't get enough bits, return what we have (skip length prefix if we got it)
+    if payload_length is not None and len(bits) > 32:
+        actual_payload_bits = min(payload_length, len(bits) - 32)
+        return ''.join(bits[32:32+actual_payload_bits])
     return ''.join(bits)
 
 # ---------- utilities ----------
@@ -394,7 +419,7 @@ def cmd_inspect(path: str):
     print("\nNote: these are estimates based on part2_3_length sums. Actual encoder behavior and bit-reservoir may alter real ancillary layout.")
 
 def cmd_embed(input_mp3: str, output_mp3: str, payload_path: Optional[str], text_payload: Optional[str],
-              bits_per_byte: int, step: int, start_frame: int, max_bytes: Optional[int]):
+              bits_per_byte: int, step: int, start_frame: int):
     with open(input_mp3, "rb") as f:
         mp3 = bytearray(f.read())
     frames = scan_frames_for_ancillary(mp3)
@@ -406,16 +431,67 @@ def cmd_embed(input_mp3: str, output_mp3: str, payload_path: Optional[str], text
         payload_bits = bits_from_text(text_payload)
     print(f"[*] Payload bits length: {len(payload_bits)}")
     capacity_bits = sum(f['ancillary_len'] * bits_per_byte for f in frames[start_frame::step])
-    if max_bytes is not None:
-        capacity_bits = min(capacity_bits, max_bytes * bits_per_byte)
     print(f"[*] Estimated ancillary capacity (bits, using step={step} from frame {start_frame}): {capacity_bits}")
-    embedded_bits, used_info = embed_into_ancillary(mp3, frames, payload_bits, bits_per_byte=bits_per_byte, step=step, start_frame=start_frame, max_bytes=max_bytes)
+    embedded_bits, used_info = embed_into_ancillary(mp3, frames, payload_bits, bits_per_byte=bits_per_byte, step=step, start_frame=start_frame)
     print(f"[*] Embedded bits: {embedded_bits}")
     print(f"[*] Frames/bytes used (sample): {used_info[:10]}")
     with open(output_mp3, "wb") as f:
         f.write(mp3)
     print(f"[*] Wrote output to {output_mp3}")
     print("[*] Extraction can be done with same step/start_frame and bits_per_byte parameters.")
+
+def embed_binary(input_mp3_data: bytes, payload_data: bytes,
+                 bits_per_byte: int = 1, step: int = 1, start_frame: int = 0) -> bytes:
+    """
+    Embed payload into MP3 binary data and return the modified MP3 data.
+    
+    Args:
+        input_mp3_data: MP3 file data as bytes
+        payload_data: Binary payload data to embed
+        bits_per_byte: Number of LSBs to use per ancillary byte (1 or 2)
+        step: Use every N-th frame for embedding
+        start_frame: Frame index to start embedding at
+    
+    Returns:
+        Modified MP3 data as bytes
+    """
+    mp3 = bytearray(input_mp3_data)
+    frames = scan_frames_for_ancillary(mp3)
+    
+    # convert payload binary data to bits
+    payload_bits = ''.join(f"{b:08b}" for b in payload_data)
+    
+    print(f"[*] Payload bits length: {len(payload_bits)}")
+    capacity_bits = sum(f['ancillary_len'] * bits_per_byte for f in frames[start_frame::step])
+    print(f"[*] Estimated ancillary capacity (bits, using step={step} from frame {start_frame}): {capacity_bits}")
+    
+    embedded_bits, used_info = embed_into_ancillary(mp3, frames, payload_bits, bits_per_byte=bits_per_byte, step=step, start_frame=start_frame)
+    print(f"[*] Embedded bits: {embedded_bits}")
+    print(f"[*] Frames/bytes used (sample): {used_info[:10]}")
+    
+    return bytes(mp3)
+
+def extract_binary(input_mp3_data: bytes, bits_per_byte: int = 1, step: int = 1, start_frame: int = 0) -> bytes:
+    """
+    Extract payload from MP3 binary data and return the extracted binary data.
+    
+    Args:
+        input_mp3_data: MP3 file data as bytes
+        bits_per_byte: Number of LSBs used per ancillary byte (1 or 2)
+        step: Frame step used during embedding
+        start_frame: Frame index where embedding started
+    
+    Returns:
+        Extracted binary data as bytes
+    """
+    frames = scan_frames_for_ancillary(input_mp3_data)
+    bitstr = extract_from_ancillary(input_mp3_data, frames, bits_per_byte=bits_per_byte, step=step, start_frame=start_frame)
+    
+    print(f"[*] Extracted bits length: {len(bitstr)} (first 200 chars): {bitstr[:200]}")
+    
+    # Convert bits back to bytes
+    data = bits_to_bytestring_with_terminator(bitstr)
+    return data
 
 def cmd_extract(input_mp3: str, output_path: Optional[str], bits_per_byte: int, step: int, start_frame: int, max_bits: Optional[int], to_text: bool):
     with open(input_mp3, "rb") as f:
@@ -473,7 +549,7 @@ def main():
     if args.cmd == 'inspect':
         cmd_inspect(args.input)
     elif args.cmd == 'embed':
-        cmd_embed(args.input, args.output, args.file, args.text, bits_per_byte=args.bits_per_byte, step=args.step, start_frame=args.start_frame, max_bytes=args.max_bytes)
+        cmd_embed(args.input, args.output, args.file, args.text, bits_per_byte=args.bits_per_byte, step=args.step, start_frame=args.start_frame)
     elif args.cmd == 'extract':
         cmd_extract(args.input, args.output, bits_per_byte=args.bits_per_byte, step=args.step, start_frame=args.start_frame, max_bits=args.max_bits, to_text=args.text)
     else:

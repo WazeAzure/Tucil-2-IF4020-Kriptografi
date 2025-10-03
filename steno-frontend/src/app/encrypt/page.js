@@ -277,6 +277,7 @@ export default function Home() {
                   <option value={1}>1-bit LSB</option>
                   <option value={2}>2-bit LSB</option>
                   <option value={3}>3-bit LSB</option>
+                  <option value={4}>4-bit LSB</option>
                 </select>
               </div>
             </div>

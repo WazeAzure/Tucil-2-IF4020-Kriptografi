@@ -68,8 +68,6 @@ def encrypt():
         mp3_data = mp3_file.read()
         embed_data = embed_file.read()
 
-        psnr = 69
-
         config['originalFileName'] = mp3_filename
         config['embeddedFileName'] = embed_filename
         config['useEncryption'] = use_encryption
@@ -77,7 +75,7 @@ def encrypt():
         config['lsbBits'] = lsb_bits
         config['encryptionKey'] = key if key else None
         
-        mp.encrypt(config, mp3_data, embed_data)
+        result = mp.encrypt(config, mp3_data, embed_data)
 
         print(f"Processing steganography:")
         print(f"  MP3 File: {mp3_filename}")
@@ -85,11 +83,8 @@ def encrypt():
         print(f"  Use Encryption: {use_encryption}")
         print(f"  Random Embedding: {random_embedding}")
         print(f"  LSB Bits: {lsb_bits}")
-        print(f"  PSNR: {psnr}")
         if key:
             print(f"  Key/Seed: {key}")
-        
-        processed_mp3_data = mp3_data
         
         configuration = {
             'originalFileName': mp3_filename,
@@ -98,10 +93,9 @@ def encrypt():
             'randomEmbedding': random_embedding,
             'lsbBits': lsb_bits,
             'encryptionKey': key if key else None,
-            'psnr' : psnr
         }
         
-        encoded_audio = base64.b64encode(processed_mp3_data).decode('utf-8')
+        encoded_audio = base64.b64encode(result).decode('utf-8')
         
         return jsonify({
             'success': True,
@@ -149,20 +143,24 @@ def decrypt():
         print(f"  LSB Bits: {lsb_bits}")
         if key:
             print(f"  Key: {key}")
+
+        config, result = mp.decrypt(mp3_data)
         
-        extracted_content = "This is a placeholder extracted file content.\nThe actual steganography decryption will be implemented later."
-        extracted_filename = "extracted_secret.txt"
+        extracted_content = result
+        extracted_filename = config["fn"]
+        file_extension = mp.extractFileExtention(extracted_filename)
         
+        encoded_file = base64.b64encode(result).decode("utf-8")
+
         configuration = {
-            'fileExtension': '.txt',
+            'fileExtension': file_extension,
             'fileName': extracted_filename,
-            'secretFileSize': '2.1 KB',
+            'secretFileSize': len(encoded_file) / 1000,  # in KB
             'useEncryption': use_encryption,
-            'randomEmbedPoint': True,
+            'randomEmbedPoint': config["re"],
             'lsbBits': lsb_bits
         }
         
-        encoded_file = base64.b64encode(extracted_content.encode('utf-8')).decode('utf-8')
         
         return jsonify({
             'success': True,

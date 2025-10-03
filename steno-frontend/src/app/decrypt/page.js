@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Upload, Key, Download, Shuffle, FileText, Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -15,15 +15,36 @@ export default function Decrypt() {
   const [lsbBits, setLsbBits] = useState(1);
   const [configuration, setConfiguration] = useState(null);
   const [extractedFileUrl, setExtractedFileUrl] = useState(null);
+  const [audioUrl, setAudioUrl] = useState(null);
+  const [fileName, setFileName] = useState("");
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+
+  useEffect(() => {
+    return () => {
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
+    };
+  }, [audioUrl]);
 
   const handleFileChange = (event) => {
     const file = event.target.files[0];
     if (file && file.type === "audio/mpeg") {
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
+      setFileName(file?.name);
       setSelectedFile(file);
+      const url = URL.createObjectURL(file);
+      setAudioUrl(url);
     } else {
+      setFileName('');
       alert("Please select an MP3 file");
       event.target.value = "";
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+        setAudioUrl(null);
+      }
     }
   };
 
@@ -133,9 +154,38 @@ export default function Decrypt() {
                 className="block w-full text-sm text-slate-500 file:mr-4 file:py-3 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
               />
             </div>
-            {selectedFile && (
-              <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg">
-                <strong>Selected:</strong> {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+            {selectedFile && fileName && (
+              <div className="space-y-4">
+                <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg">
+                  <strong>Selected:</strong> {fileName} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                </div>
+                
+                {audioUrl && (
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center">
+                        <svg className="w-4 h-4 text-slate-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM15.657 6.343a1 1 0 011.414 0A9.972 9.972 0 0119 12a9.972 9.972 0 01-1.929 5.657 1 1 0 11-1.414-1.414A7.971 7.971 0 0017 12a7.971 7.971 0 00-1.343-4.243 1 1 0 010-1.414z" clipRule="evenodd" />
+                          <path fillRule="evenodd" d="M13.829 8.172a1 1 0 011.414 0A5.983 5.983 0 0117 12a5.983 5.983 0 01-1.757 3.828 1 1 0 11-1.414-1.414A3.987 3.987 0 0015 12a3.987 3.987 0 00-1.171-2.828 1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <span className="text-sm font-medium text-slate-700">Embedded Audio Preview</span>
+                    </div>
+                    <audio 
+                      key={audioUrl}
+                      controls 
+                      className="w-full h-10"
+                      preload="metadata"
+                      style={{
+                        outline: 'none',
+                        background: 'transparent'
+                      }}
+                    >
+                      <source src={audioUrl} type="audio/mpeg" />
+                      Your browser does not support the audio element.
+                    </audio>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -265,7 +315,6 @@ export default function Decrypt() {
                         <div className="space-y-1 text-xs text-slate-600">
                           <div><strong>File Extension:</strong> {configuration.fileExtension}</div>
                           <div><strong>File Name:</strong> {configuration.fileName}</div>
-                          <div><strong>Secret File Size:</strong> {configuration.secretFileSize}</div>
                           <div><strong>Use Encryption:</strong> {configuration.useEncryption ? 'Yes' : 'No'}</div>
                           <div><strong>Random Embed Point:</strong> {configuration.randomEmbedPoint ? 'Yes' : 'No'}</div>
                           <div><strong>LSB Bits:</strong> {configuration.lsbBits}-bit</div>
