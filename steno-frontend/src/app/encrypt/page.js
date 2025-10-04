@@ -33,9 +33,23 @@ export default function Home() {
   const [processedAudioUrl, setProcessedAudioUrl] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorDialog, setErrorDialog] = useState({ open: false, title: "", message: "" });
+  const [embedFileHash, setEmbedFileHash] = useState("");
 
   const showError = (title, message) => {
     setErrorDialog({ open: true, title, message });
+  };
+
+  const calculateSHA256 = async (file) => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      return hashHex;
+    } catch (error) {
+      console.error('Error calculating SHA-256:', error);
+      return 'Error calculating hash';
+    }
   };
 
   useEffect(() => {
@@ -76,11 +90,15 @@ export default function Home() {
     }
   };
 
-  const handleEmbedFileChange = (event) => {
+  const handleEmbedFileChange = async (event) => {
     const file = event.target.files[0];
     if (file) {
       setEmbedFile(file);
+      const hash = await calculateSHA256(file);
+      setEmbedFileHash(hash);
       toast.success('File to embed uploaded successfully!');
+    } else {
+      setEmbedFileHash("");
     }
   };
 
@@ -258,8 +276,23 @@ export default function Home() {
               />
             </div>
             {embedFile && (
-              <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg">
-                <strong>Selected:</strong> {embedFile.name} ({(embedFile.size / 1024).toFixed(2)} KB)
+              <div className="space-y-3">
+                <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg">
+                  <strong>Selected:</strong> {embedFile.name} ({(embedFile.size / 1024).toFixed(2)} KB)
+                </div>
+                {embedFileHash && (
+                  <div className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <svg className="w-3 h-3 text-slate-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      <strong>File Integrity (SHA-256):</strong>
+                    </div>
+                    <code className="font-mono text-xs break-all bg-white px-2 py-1 rounded border">
+                      {embedFileHash}
+                    </code>
+                  </div>
+                )}
               </div>
             )}
           </div>
