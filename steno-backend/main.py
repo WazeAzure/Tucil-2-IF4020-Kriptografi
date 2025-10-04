@@ -148,7 +148,10 @@ def decrypt():
         if key:
             print(f"  Key: {key}")
 
-        config, result = mp.decrypt(mp3_data, key=key if (key and (use_encryption or random_embedding)) else None, is_scrambled=random_embedding, is_encrypted=use_encryption, bits_per_byte=lsb_bits)
+        config, result = mp.decrypt(mp3_data, key=key if (key and (use_encryption or random_embedding)) else None,
+                                    is_scrambled=random_embedding,
+                                    is_encrypted=use_encryption,
+                                    bits_per_byte=lsb_bits)
         
         extracted_content = result
         extracted_filename = config["fn"]

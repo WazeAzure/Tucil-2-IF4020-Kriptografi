@@ -61,15 +61,17 @@ def encrypt(config : dict, audio_data, embed_data):
     config_length = len(embbedded_config_json)
     config_len_bytes = struct.pack(">I", config_length)
 
-    payload_data = embbedded_config_json + embed_data
+    payload_data = config_len_bytes + embbedded_config_json + embed_data
     
     seed = None
 
     if config['encryptionKey'] is not None:
         payload_data = ci.vignereCipher(payload_data, generated_key)
-        seed = ci.generateSeed(generated_key)
     
-    final_payload = config_len_bytes + payload_data
+    if config["randomEmbedding"]:
+        seed = ci.generateSeed(generated_key)
+
+    final_payload = payload_data
 
     result = ad.embed_binary(audio_data,
                     final_payload,
@@ -78,7 +80,6 @@ def encrypt(config : dict, audio_data, embed_data):
                     start_frame=0,
                     seed=seed)
     
-    # Calculate PSNR between original and embedded audio
     psnr_value = calculate_psnr(audio_data, result)
     print(f"PSNR between original and embedded audio: {psnr_value} dB")
     print("embbedded_config_json:", embbedded_config_json)
@@ -100,18 +101,17 @@ def decrypt(audio_data, key=None, is_scrambled=False, is_encrypted=False, bits_p
     if result is None:
         raise ValueError("No hidden data found in the audio file.")
     
-    config_length = struct.unpack(">I", result[:4])[0]
-    encrypted_payload = result[4:]
-    
     if is_encrypted and key is not None:
-        decrypted_payload = ci.vignereDecipher(encrypted_payload, generated_key)
+        decrypted_payload = ci.vignereDecipher(result, generated_key)
     else:
-        decrypted_payload = encrypted_payload
+        decrypted_payload = result
+
+    config_length = struct.unpack(">I", decrypted_payload[:4])[0]
     
-    config_json = decrypted_payload[:config_length]
+    config_json = decrypted_payload[4:4+config_length]
     config = json.loads(config_json.decode("utf-8"))
     
-    extracted_data = decrypted_payload[config_length:]
+    extracted_data = decrypted_payload[4+config_length:]
 
     print("Extracted Config:", config)
     return config, extracted_data
