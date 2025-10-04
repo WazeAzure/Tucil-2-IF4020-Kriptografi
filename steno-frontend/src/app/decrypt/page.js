@@ -2,11 +2,19 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Upload, Key, Download, Shuffle, FileText, Settings, Loader2 } from "lucide-react";
+import { Upload, Key, Download, Shuffle, FileText, Settings, Loader2, AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import NavButton from "@/components/ui/navButton";
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function Decrypt() {
   const router = useRouter();
@@ -21,7 +29,12 @@ export default function Decrypt() {
   const [audioUrl, setAudioUrl] = useState(null);
   const [fileName, setFileName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [errorDialog, setErrorDialog] = useState({ open: false, title: "", message: "" });
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+
+  const showError = (title, message) => {
+    setErrorDialog({ open: true, title, message });
+  };
 
   useEffect(() => {
     return () => {
@@ -44,7 +57,7 @@ export default function Decrypt() {
       toast.success('MP3 file uploaded successfully!');
     } else {
       setFileName('');
-      alert("Please select an MP3 file");
+      showError("Invalid File Type", "Please select an MP3 file. Only audio/mpeg files are supported.");
       event.target.value = "";
       if (audioUrl) {
         URL.revokeObjectURL(audioUrl);
@@ -91,11 +104,18 @@ export default function Decrypt() {
         body: formData,
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      let result;
+      try {
+        result = await response.json();
+      } catch (parseError) {
+        console.error('Error parsing response:', parseError);
+        throw new Error(`Server returned invalid response (Status: ${response.status})`);
       }
 
-      const result = await response.json();
+      if (!response.ok) {
+        const errorMessage = result?.error || result?.message || `Server error (Status: ${response.status})`;
+        throw new Error(errorMessage);
+      }
       
       if (result.success) {
         console.log("Decrypt successful:", result);
@@ -121,16 +141,17 @@ export default function Decrypt() {
             setExtractedFileUrl(fileUrl);
           } catch (error) {
             console.error('Error processing extracted file data:', error);
-            alert('Error processing extracted file: ' + error.message);
+            showError('File Processing Error', `Error processing extracted file: ${error.message}`);
           }
         }
       } else {
-        console.error("Decrypt failed:", result.error);
-        alert(`Decryption failed: ${result.error}`);
+        const errorMessage = result.error || result.message || 'Unknown error occurred during decryption';
+        console.error("Decrypt failed:", errorMessage);
+        showError('Decryption Failed', errorMessage);
       }
     } catch (error) {
       console.error("Error during decryption:", error);
-      alert(`Error during decryption: ${error.message}`);
+      showError('Decryption Error', error.message || 'An unexpected error occurred during decryption');
     } finally {
       setIsLoading(false);
     }
@@ -418,6 +439,29 @@ export default function Decrypt() {
           <p>Decrypt and extract hidden files from audio steganography</p>
         </div>
       </div>
+      
+      {/* Error Dialog */}
+      <Dialog open={errorDialog.open} onOpenChange={(open) => setErrorDialog({ ...errorDialog, open })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="w-5 h-5" />
+              {errorDialog.title}
+            </DialogTitle>
+            <DialogDescription className="text-slate-600 mt-2">
+              {errorDialog.message}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button 
+              onClick={() => setErrorDialog({ open: false, title: "", message: "" })}
+              className="bg-slate-700 hover:bg-slate-800 text-white"
+            >
+              OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       <ToastContainer
         position="top-right"

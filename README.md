@@ -1,4 +1,4 @@
-# Steganografi Audio dengan Metode Multiple-LSB
+# MP3 Steganography Tool
 
 Tugas Kecil 2 - IF4020 Kriptografi  
 **Steganografi pada Berkas Audio dengan Metode Multiple-LSB**
@@ -136,9 +136,31 @@ def vignereCipher(input_bytes, key_bytes):
 def scramble_frames_with_seed(frames_info, seed):
     random.seed(seed)
     indices = list(range(len(frames_info)))
-    random.shuffle(indices)
+    random.shuffle(indices) 
     return [frames_info[i] for i in indices]
 ```
+
+## 🛠️ Teknologi yang Digunakan
+
+### Backend
+- **Python Flask 2.3.3**
+
+### Frontend
+- **Next.js 15.5.4**
+
+## 📦 Dependensi
+
+### Backend
+Dependensi backend didefinisikan dalam file `requirements.txt`:
+
+```
+Flask==2.3.3
+Flask-Cors==3.0.10
+Werkzeug==2.3.3
+```
+
+### Frontend
+Dependensi frontend didefinisikan dalam file `package.json`:
 
 ## 📝 Catatan Penting
 

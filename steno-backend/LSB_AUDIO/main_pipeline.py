@@ -1,6 +1,7 @@
 import re
 import json
 import struct
+import math
 
 import LSB_AUDIO.cipher as ci
 import LSB_AUDIO.ancillary_data as ad
@@ -8,6 +9,28 @@ import LSB_AUDIO.ancillary_data as ad
 def extractFileExtention(filename: str) -> str:
     match = re.search(r"\.([^.]+)$", filename)
     return match.group(1) if match else None
+
+def calculate_psnr(original_data: bytes, embedded_data: bytes) -> float:
+    if len(original_data) != len(embedded_data):
+        raise ValueError("Audio data lengths must be equal for PSNR calculation")
+    
+    if len(original_data) == 0:
+        raise ValueError("Audio data cannot be empty")
+    
+    mse = 0.0
+    for i in range(len(original_data)):
+        diff = int(original_data[i]) - int(embedded_data[i])
+        mse += diff * diff
+    
+    mse = mse / len(original_data)
+    
+    if mse == 0:
+        return float('inf')  # Perfect quality
+    
+    max_pixel_value = 255.0
+    psnr = 20 * math.log10(max_pixel_value / math.sqrt(mse))
+    
+    return round(psnr, 2)
 
 def encrypt(config : dict, audio_data, embed_data):
     # config['originalFileName'] = mp3_filename
@@ -54,10 +77,15 @@ def encrypt(config : dict, audio_data, embed_data):
                     step=1,
                     start_frame=0,
                     seed=seed)
+    
+    # Calculate PSNR between original and embedded audio
+    psnr_value = calculate_psnr(audio_data, result)
+    print(f"PSNR between original and embedded audio: {psnr_value} dB")
     print("embbedded_config_json:", embbedded_config_json)
-    return result
+    
+    return result, psnr_value
 
-def decrypt(audio_data, key=None, is_scrambled=False, is_encrypted=False):
+def decrypt(audio_data, key=None, is_scrambled=False, is_encrypted=False, bits_per_byte = 1):
     scramble_seed = None
     if is_scrambled and key is not None:
         generated_key = ci.generateKey(key)
@@ -68,7 +96,7 @@ def decrypt(audio_data, key=None, is_scrambled=False, is_encrypted=False):
         generated_key = ci.generateKey(key)
         print("Generated Key:", generated_key)
     
-    result = ad.extract_binary(audio_data, step=1, start_frame=0, seed=scramble_seed)
+    result = ad.extract_binary(audio_data, step=1, start_frame=0, seed=scramble_seed, bits_per_byte=bits_per_byte)
     if result is None:
         raise ValueError("No hidden data found in the audio file.")
     

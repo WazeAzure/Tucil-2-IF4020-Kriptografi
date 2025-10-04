@@ -2,11 +2,19 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Upload, Key, Download, Shuffle, FileText, Settings, Loader2 } from "lucide-react";
+import { Upload, Key, Download, Shuffle, FileText, Settings, Loader2, AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import NavButton from "@/components/ui/navButton";
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function Home() {
   const router = useRouter();
@@ -24,6 +32,11 @@ export default function Home() {
   const [configuration, setConfiguration] = useState(null);
   const [processedAudioUrl, setProcessedAudioUrl] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorDialog, setErrorDialog] = useState({ open: false, title: "", message: "" });
+
+  const showError = (title, message) => {
+    setErrorDialog({ open: true, title, message });
+  };
 
   useEffect(() => {
     return () => {
@@ -54,7 +67,7 @@ export default function Home() {
       toast.success('MP3 file uploaded successfully!');
     } else {
       setFileName('')
-      alert("Please select an MP3 file");
+      showError("Invalid File Type", "Please select an MP3 file. Only audio/mpeg files are supported.");
       event.target.value = "";
       if (audioUrl) {
         URL.revokeObjectURL(audioUrl);
@@ -110,11 +123,18 @@ export default function Home() {
         body: formData,
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      let result;
+      try {
+        result = await response.json();
+      } catch (parseError) {
+        console.error('Error parsing response:', parseError);
+        throw new Error(`Server returned invalid response (Status: ${response.status})`);
       }
 
-      const result = await response.json();
+      if (!response.ok) {
+        const errorMessage = result?.error || result?.message || `Server error (Status: ${response.status})`;
+        throw new Error(errorMessage);
+      }
       
       if (result.success) {
         console.log("Embed successful:", result);
@@ -145,16 +165,17 @@ export default function Home() {
           } catch (error) {
             console.error('Error processing audio data:', error);
             console.error('Base64 data length:', result.audioData?.length);
-            alert('Error processing returned audio file: ' + error.message);
+            showError('Audio Processing Error', `Error processing returned audio file: ${error.message}`);
           }
         }
       } else {
-        console.error("Embed failed:", result.error);
-        alert(`Embedding failed: ${result.error}`);
+        const errorMessage = result.error || result.message || 'Unknown error occurred during embedding';
+        console.error("Embed failed:", errorMessage);
+        showError('Embedding Failed', errorMessage);
       }
     } catch (error) {
       console.error("Error during embedding:", error);
-      alert(`Error during embedding: ${error.message}`);
+      showError('Embedding Error', error.message || 'An unexpected error occurred during embedding');
     } finally {
       setIsLoading(false);
     }
@@ -439,6 +460,7 @@ export default function Home() {
                           <div><strong>Use Encryption:</strong> {configuration.useEncryption ? 'Yes' : 'No'}</div>
                           <div><strong>Random Embedding:</strong> {configuration.randomEmbedding ? 'Yes' : 'No'}</div>
                           <div><strong>LSB Bits:</strong> {configuration.lsbBits}-bit</div>
+                          <div><strong>PSNR:</strong> {configuration.psnr} dB</div>
                           {configuration.encryptionKey && (
                             <div><strong>Encryption Key:</strong> {configuration.encryptionKey}</div>
                           )}
@@ -485,6 +507,29 @@ export default function Home() {
           <p>Secure audio steganography with encryption</p>
         </div>
       </div>
+      
+      {/* Error Dialog */}
+      <Dialog open={errorDialog.open} onOpenChange={(open) => setErrorDialog({ ...errorDialog, open })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="w-5 h-5" />
+              {errorDialog.title}
+            </DialogTitle>
+            <DialogDescription className="text-slate-600 mt-2">
+              {errorDialog.message}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button 
+              onClick={() => setErrorDialog({ open: false, title: "", message: "" })}
+              className="bg-slate-700 hover:bg-slate-800 text-white"
+            >
+              OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       <ToastContainer
         position="top-right"

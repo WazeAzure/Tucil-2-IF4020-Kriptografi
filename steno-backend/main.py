@@ -75,7 +75,7 @@ def encrypt():
         config['lsbBits'] = lsb_bits
         config['encryptionKey'] = key if key else None
         
-        result = mp.encrypt(config, mp3_data, embed_data)
+        result, psnr_value = mp.encrypt(config, mp3_data, embed_data)
 
         print(f"Processing steganography:")
         print(f"  MP3 File: {mp3_filename}")
@@ -83,6 +83,7 @@ def encrypt():
         print(f"  Use Encryption: {use_encryption}")
         print(f"  Random Embedding: {random_embedding}")
         print(f"  LSB Bits: {lsb_bits}")
+        print(f"  PSNR: {psnr_value} dB")
         if key:
             print(f"  Key/Seed: {key}")
         
@@ -92,6 +93,7 @@ def encrypt():
             'useEncryption': use_encryption,
             'randomEmbedding': random_embedding,
             'lsbBits': lsb_bits,
+            'psnr': psnr_value,
             'encryptionKey': key if key else None,
         }
         
@@ -146,7 +148,7 @@ def decrypt():
         if key:
             print(f"  Key: {key}")
 
-        config, result = mp.decrypt(mp3_data, key=key if (key and (use_encryption or random_embedding)) else None, is_scrambled=random_embedding, is_encrypted=use_encryption)
+        config, result = mp.decrypt(mp3_data, key=key if (key and (use_encryption or random_embedding)) else None, is_scrambled=random_embedding, is_encrypted=use_encryption, bits_per_byte=lsb_bits)
         
         extracted_content = result
         extracted_filename = config["fn"]
