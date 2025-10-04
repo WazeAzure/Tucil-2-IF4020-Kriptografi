@@ -285,7 +285,7 @@ def embed_into_ancillary(mp3_bytes: bytearray, frames_info: List[Dict], payload_
     - start_frame: index to start embedding
     - returns number of bits embedded and list of positions used (frame_index, abs_byte_idx, bit_positions)
     """
-    assert bits_per_byte in (1,2)
+    assert bits_per_byte in (1,2,3,4)
     total_capacity_bits = 0
     for f in frames_info:
         if f['ancillary_len'] > 0:

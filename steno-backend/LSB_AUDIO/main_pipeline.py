@@ -28,9 +28,6 @@ def encrypt(config : dict, audio_data, embed_data):
         "ls" : config['lsbBits'],
     }
 
-    if config['lsbBits'] not in [1, 2]:
-        config['lsbBits'] = 1
-
     if (config['encryptionKey'] is not None):
         generated_key = ci.generateKey(config['encryptionKey'])
         generated_seed = ci.generateSeed(generated_key)
