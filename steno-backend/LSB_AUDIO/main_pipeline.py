@@ -65,7 +65,7 @@ def encrypt(config : dict, audio_data, embed_data):
     
     seed = None
 
-    if config['encryptionKey'] is not None:
+    if config['useEncryption']:
         payload_data = ci.vignereCipher(payload_data, generated_key)
     
     if config["randomEmbedding"]:
@@ -101,7 +101,7 @@ def decrypt(audio_data, key=None, is_scrambled=False, is_encrypted=False, bits_p
     if result is None:
         raise ValueError("No hidden data found in the audio file.")
     
-    if is_encrypted and key is not None:
+    if is_encrypted:
         decrypted_payload = ci.vignereDecipher(result, generated_key)
     else:
         decrypted_payload = result

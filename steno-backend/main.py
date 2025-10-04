@@ -73,6 +73,7 @@ def encrypt():
         config['useEncryption'] = use_encryption
         config['randomEmbedding'] = random_embedding
         config['lsbBits'] = lsb_bits
+        config['useEncryption'] = use_encryption
         config['encryptionKey'] = key if key else None
         
         result, psnr_value = mp.encrypt(config, mp3_data, embed_data)
